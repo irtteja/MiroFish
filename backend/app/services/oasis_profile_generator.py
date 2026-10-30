@@ -262,14 +262,12 @@ class OasisProfileGenerator:
         
         # Zep客户端用于检索丰富上下文
         self.zep_api_key = zep_api_key or Config.ZEP_API_KEY
-        self.zep_client = None
         self.graph_id = graph_id
-        
-        if self.zep_api_key:
-            try:
-                self.zep_client = get_zep_client(self.zep_api_key)
-            except Exception as e:
-                logger.warning(f"Zep客户端初始化失败: {e}")
+        try:
+            self.zep_client = get_zep_client(self.zep_api_key or None)
+        except Exception as e:
+            logger.warning(f"Zep客户端初始化失败: {e}")
+            self.zep_client = None
     
     def generate_profile_from_entity(
         self, 

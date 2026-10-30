@@ -5,7 +5,10 @@ Zep实体读取与过滤服务
 
 from typing import Dict, Any, List, Optional, Set, Callable, TypeVar
 from dataclasses import dataclass, field
-from zep_cloud import NotFoundError
+try:
+    from zep_cloud import NotFoundError
+except ImportError:
+    from ..utils.local_zep import NotFoundError  # type: ignore[assignment]
 
 from ..config import Config
 from ..utils.logger import get_logger
@@ -79,10 +82,7 @@ class ZepEntityReader:
     
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or Config.ZEP_API_KEY
-        if not self.api_key:
-            raise ValueError("ZEP_API_KEY 未配置")
-        
-        self.client = get_zep_client(self.api_key)
+        self.client = get_zep_client(self.api_key or None)
     
     def _call_with_retry(
         self, 

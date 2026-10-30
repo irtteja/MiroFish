@@ -12,7 +12,10 @@ import time
 import json
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
-from zep_cloud import NotFoundError
+try:
+    from zep_cloud import NotFoundError
+except ImportError:
+    from ..utils.local_zep import NotFoundError  # type: ignore[assignment]
 
 from ..config import Config
 from ..utils.logger import get_logger
@@ -429,10 +432,7 @@ class ZepToolsService:
     
     def __init__(self, api_key: Optional[str] = None, llm_client: Optional[LLMClient] = None):
         self.api_key = api_key or Config.ZEP_API_KEY
-        if not self.api_key:
-            raise ValueError("ZEP_API_KEY 未配置")
-        
-        self.client = get_zep_client(self.api_key)
+        self.client = get_zep_client(self.api_key or None)
         # LLM客户端用于InsightForge生成子问题
         self._llm_client = llm_client
         logger.info(t("console.zepToolsInitialized"))

@@ -5,7 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from zep_cloud.client import Zep
+try:
+    from zep_cloud.client import Zep
+except ImportError:
+    Zep = None  # type: ignore[assignment,misc]
 
 from .logger import get_logger
 from .zep import call_zep_read_with_retry

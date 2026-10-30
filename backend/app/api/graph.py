@@ -9,7 +9,10 @@ import traceback
 import threading
 from contextlib import ExitStack, nullcontext
 from flask import request, jsonify
-from zep_cloud import NotFoundError
+try:
+    from zep_cloud import NotFoundError
+except ImportError:
+    from ..utils.local_zep import NotFoundError  # type: ignore[assignment]
 
 from . import graph_bp
 from ..config import Config

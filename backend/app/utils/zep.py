@@ -7,9 +7,23 @@ import time
 from functools import lru_cache
 from typing import Any, Callable, TypeVar
 
-import httpx
-from zep_cloud.client import Zep
-from zep_cloud.core.api_error import ApiError as ZepApiError
+try:
+    import httpx as _httpx
+    _HTTPX_TIMEOUT = _httpx.TimeoutException
+    _HTTPX_TRANSPORT = _httpx.TransportError
+except ImportError:
+    _httpx = None  # type: ignore[assignment]
+    _HTTPX_TIMEOUT = None  # type: ignore[assignment]
+    _HTTPX_TRANSPORT = None  # type: ignore[assignment]
+
+try:
+    from zep_cloud.client import Zep
+    from zep_cloud.core.api_error import ApiError as ZepApiError
+    _ZEP_CLOUD_AVAILABLE = True
+except ImportError:
+    Zep = None  # type: ignore[assignment,misc]
+    ZepApiError = None  # type: ignore[assignment]
+    _ZEP_CLOUD_AVAILABLE = False
 
 from ..config import Config
 from .logger import get_logger
@@ -62,8 +76,13 @@ def _cached_zep_client(api_key: str, timeout: float) -> Zep:
     )
 
 
-def get_zep_client(api_key: str | None = None, timeout: float | None = None) -> Zep:
-    """Return a process-shared, explicitly configured Zep Cloud client."""
+def get_zep_client(api_key: str | None = None, timeout: float | None = None):
+    """Return a Zep client.
+
+    When ZEP_API_KEY is set, returns a process-shared, explicitly configured
+    Zep Cloud client. When no key is available, returns a LocalZepClient that
+    uses the local `claude -p` CLI — no API key required.
+    """
 
     # zep-cloud gives ZEP_API_URL precedence even when base_url is explicit.
     # Reject it so this Cloud-only integration cannot silently target a
@@ -73,7 +92,9 @@ def get_zep_client(api_key: str | None = None, timeout: float | None = None) -> 
 
     normalized_key = (api_key or Config.ZEP_API_KEY or "").strip()
     if not normalized_key:
-        raise ValueError("ZEP_API_KEY 未配置")
+        from .local_zep import LocalZepClient
+        logger.info("ZEP_API_KEY not set — using local in-memory Zep replacement")
+        return LocalZepClient()
 
     request_timeout = float(
         timeout if timeout is not None else ZEP_HTTP_REQUEST_TIMEOUT_SECONDS
@@ -92,11 +113,11 @@ def clear_zep_client_cache() -> None:
 def is_retryable_zep_error(error: BaseException) -> bool:
     """Return whether a failed *read* is safe and useful to retry."""
 
-    if isinstance(error, (httpx.TimeoutException, httpx.TransportError)):
+    if _HTTPX_TIMEOUT is not None and isinstance(error, (_HTTPX_TIMEOUT, _HTTPX_TRANSPORT)):
         return True
     if isinstance(error, (ConnectionError, TimeoutError, OSError)):
         return True
-    if isinstance(error, ZepApiError):
+    if ZepApiError is not None and isinstance(error, ZepApiError):
         status_code = error.status_code
         return status_code in {408, 429} or (
             status_code is not None and 500 <= status_code <= 599
@@ -105,7 +126,7 @@ def is_retryable_zep_error(error: BaseException) -> bool:
 
 
 def _retry_after_seconds(error: BaseException) -> float | None:
-    if not isinstance(error, ZepApiError) or not error.headers:
+    if ZepApiError is None or not isinstance(error, ZepApiError) or not error.headers:
         return None
     value = next(
         (

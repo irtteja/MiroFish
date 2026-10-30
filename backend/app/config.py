@@ -67,7 +67,12 @@ class Config:
         if not cls.LLM_API_KEY:
             errors.append("LLM_API_KEY 未配置")
         if not cls.ZEP_API_KEY:
-            errors.append("ZEP_API_KEY 未配置")
+            import warnings
+            warnings.warn(
+                "ZEP_API_KEY is not set. Agent memory features will fail at runtime. "
+                "Get a free key at https://app.getzep.com",
+                RuntimeWarning,
+            )
         if os.environ.get("ZEP_API_URL"):
             errors.append("ZEP_API_URL 不受支持；MiroFish 仅连接 Zep Cloud")
         if cls.DEBUG:
